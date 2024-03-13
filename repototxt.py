@@ -2,24 +2,20 @@ import os
 from tqdm import tqdm
 import zipfile
 import mimetypes
-import fnmatch
+from pathlib import Path
 
-def is_excluded(path, base_path, exclusion_patterns):
-    rel_path = os.path.relpath(path, base_path)
+def is_excluded(path, exclusion_patterns):
     for pattern in exclusion_patterns:
-        if fnmatch.fnmatch(rel_path, pattern):
+        if path.match(pattern):
             return True
     return False
 
 def get_repo_contents(repo_path, exclusion_patterns):
     repo_contents = ""
-    for root, dirs, files in os.walk(repo_path):
-        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), repo_path, exclusion_patterns)]
-        for file in files:
-            file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_excluded(file_path, repo_path, exclusion_patterns):
-                file_contents = get_file_contents(file_path)
-                repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
+    for file_path in Path(repo_path).rglob("*"):
+        if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, exclusion_patterns):
+            file_contents = get_file_contents(file_path)
+            repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
     return repo_contents
 
 def get_file_contents(file_path):
@@ -42,57 +38,52 @@ def create_project_zip(project_path, zip_file_path, exclusion_patterns):
     print("Parsing and counting files in the project...")
     file_list = []
     file_count = 0
-    for root, dirs, files in os.walk(project_path):
-        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), project_path, exclusion_patterns)]
-        for file in files:
-            file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_excluded(file_path, project_path, exclusion_patterns):
-                file_list.append((file_path, os.path.relpath(file_path, project_path)))
-                file_count += 1
-                print(f"Files counted: {file_count}", end="\r")
+    for file_path in Path(project_path).rglob("*"):
+        if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, exclusion_patterns):
+            file_list.append(file_path)
+            file_count += 1
+            print(f"Files counted: {file_count}", end="\r")
     print("\nCreating ZIP file...")
     with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         with tqdm(total=len(file_list), desc="Adding files to ZIP", unit="file", ncols=100, leave=False) as pbar:
-            for file_path, file_name in file_list:
-                zipf.write(file_path, file_name)
+            for file_path in file_list:
+                zipf.write(file_path, file_path.relative_to(project_path))
                 pbar.update(1)
 
 def analyze_rails_project(project_path, exclusion_patterns):
     print("Analyzing Ruby on Rails project...")
 
     # Analyze controllers
-    controllers_path = os.path.join(project_path, "app", "controllers")
-    if os.path.exists(controllers_path):
+    controllers_path = Path(project_path) / "app" / "controllers"
+    if controllers_path.exists():
         print("Controllers:")
-        for controller_file in os.listdir(controllers_path):
-            if controller_file.endswith(".rb") and not is_excluded(os.path.join(controllers_path, controller_file), project_path, exclusion_patterns):
-                print(f"  - {controller_file}")
+        for controller_file in controllers_path.glob("*.rb"):
+            if not is_excluded(controller_file, exclusion_patterns):
+                print(f"  - {controller_file.name}")
 
     # Analyze routes
-    routes_path = os.path.join(project_path, "config", "routes.rb")
-    if os.path.exists(routes_path) and not is_excluded(routes_path, project_path, exclusion_patterns):
+    routes_path = Path(project_path) / "config" / "routes.rb"
+    if routes_path.exists() and not is_excluded(routes_path, exclusion_patterns):
         print("Routes:")
         with open(routes_path, "r") as routes_file:
             routes_content = routes_file.read()
             print(routes_content)
 
     # Analyze models
-    models_path = os.path.join(project_path, "app", "models")
-    if os.path.exists(models_path):
+    models_path = Path(project_path) / "app" / "models"
+    if models_path.exists():
         print("Models:")
-        for model_file in os.listdir(models_path):
-            if model_file.endswith(".rb") and not is_excluded(os.path.join(models_path, model_file), project_path, exclusion_patterns):
-                print(f"  - {model_file}")
+        for model_file in models_path.glob("*.rb"):
+            if not is_excluded(model_file, exclusion_patterns):
+                print(f"  - {model_file.name}")
 
     # Analyze views
-    views_path = os.path.join(project_path, "app", "views")
-    if os.path.exists(views_path):
+    views_path = Path(project_path) / "app" / "views"
+    if views_path.exists():
         print("Views:")
-        for root, dirs, files in os.walk(views_path):
-            dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), project_path, exclusion_patterns)]
-            for file in files:
-                if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_excluded(os.path.join(root, file), project_path, exclusion_patterns):
-                    print(f"  - {os.path.relpath(os.path.join(root, file), views_path)}")
+        for view_file in views_path.rglob("*"):
+            if view_file.is_file() and view_file.suffix in [".html.erb", ".html.haml", ".html.slim"] and not is_excluded(view_file, exclusion_patterns):
+                print(f"  - {view_file.relative_to(views_path)}")
 
 def process_project(project_path, exclusion_file):
     project_name = os.path.basename(project_path)

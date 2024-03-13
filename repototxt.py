@@ -16,10 +16,13 @@ def is_binary_file(file_path):
 def is_sock_file(file_path):
     return file_path.endswith('.sock')
 
+def is_node_modules_dir(dir_path):
+    return os.path.basename(dir_path) == 'node_modules'
+
 def get_repo_contents(repo_path):
     repo_contents = ""
     for root, dirs, files in os.walk(repo_path):
-        dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
+        dirs[:] = [d for d in dirs if not is_hidden(d) and not is_node_modules_dir(d)]  # Ignore hidden directories and node_modules
         for file in files:
             file_path = os.path.join(root, file)
             if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path) and not is_sock_file(file_path):  # Skip symbolic links, binary files, hidden files, .local.yml files, and .sock files
@@ -44,15 +47,20 @@ def create_project_zip(project_path, zip_file_path):
     if os.path.exists(zip_file_path):
         print(f"Overwriting existing ZIP file: {zip_file_path}")
         os.remove(zip_file_path)
+    print("Parsing and counting files in the project...")
     file_list = []
+    file_count = 0
     for root, dirs, files in os.walk(project_path):
-        dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
+        dirs[:] = [d for d in dirs if not is_hidden(d) and not is_node_modules_dir(d)]  # Ignore hidden directories and node_modules
         for file in files:
             file_path = os.path.join(root, file)
             if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path) and not is_sock_file(file_path):  # Skip symbolic links, binary files, hidden files, .local.yml files, and .sock files
                 file_list.append((file_path, os.path.relpath(file_path, project_path)))
+                file_count += 1
+                print(f"Files counted: {file_count}", end="\r")
+    print("\nCreating ZIP file...")
     with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        with tqdm(total=len(file_list), desc="Creating ZIP file", unit="file", ncols=100, leave=False) as pbar:
+        with tqdm(total=len(file_list), desc="Adding files to ZIP", unit="file", ncols=100, leave=False) as pbar:
             for file_path, file_name in file_list:
                 zipf.write(file_path, file_name)
                 pbar.update(1)
@@ -89,7 +97,7 @@ def analyze_rails_project(project_path):
     if os.path.exists(views_path):
         print("Views:")
         for root, dirs, files in os.walk(views_path):
-            dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
+            dirs[:] = [d for d in dirs if not is_hidden(d) and not is_node_modules_dir(d)]  # Ignore hidden directories and node_modules
             for file in files:
                 if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_hidden(file) and not is_local_yml(file) and not is_sock_file(file):
                     print(f"  - {os.path.relpath(os.path.join(root, file), views_path)}")

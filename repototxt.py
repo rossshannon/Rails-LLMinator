@@ -44,7 +44,7 @@ def create_project_zip(project_path, zip_file_path):
     with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(project_path):
             dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
-            for file in files:
+            for file in tqdm(files, desc="Adding files to ZIP", unit="file"):
                 file_path = os.path.join(root, file)
                 if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path):  # Skip symbolic links, binary files, hidden files, and .local.yml files
                     zipf.write(file_path, os.path.relpath(file_path, project_path))

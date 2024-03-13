@@ -1,127 +1,80 @@
 import os
-import git
 from tqdm import tqdm
 import ast
 import zipfile
+import mimetypes
 
-def clone_local_repo(repo_path):
-    """
-    Clone or access the local Git repository.
-    """
-    repo = git.Repo(repo_path)
-    return repo
-
-def analyze_rails_project(repo_path):
-    """
-    Analyze the Ruby on Rails project.
-    """
-    summary = {}
-
-    # Extract information from controllers
-    controllers_path = os.path.join(repo_path, 'app', 'controllers')
-    if os.path.exists(controllers_path):
-        summary['controllers'] = []
-        for root, dirs, files in os.walk(controllers_path):
-            for file in files:
-                if file.endswith('.rb'):
-                    controller_path = os.path.join(root, file)
-                    with open(controller_path, 'r') as f:
-                        controller_code = f.read()
-                    controller_info = {
-                        'name': file[:-3],
-                        'actions': [],
-                        'code': controller_code
-                    }
-                    ruby_ast = ast.parse(controller_code)
-                    for node in ast.walk(ruby_ast):
-                        if isinstance(node, ast.FunctionDef):
-                            controller_info['actions'].append(node.name)
-                    summary['controllers'].append(controller_info)
-
-    # Extract information from models
-    models_path = os.path.join(repo_path, 'app', 'models')
-    if os.path.exists(models_path):
-        summary['models'] = []
-        for root, dirs, files in os.walk(models_path):
-            for file in files:
-                if file.endswith('.rb'):
-                    model_path = os.path.join(root, file)
-                    with open(model_path, 'r') as f:
-                        model_code = f.read()
-                    model_info = {
-                        'name': file[:-3],
-                        'code': model_code
-                    }
-                    summary['models'].append(model_info)
-
-    # Extract information from routes
-    routes_path = os.path.join(repo_path, 'config', 'routes.rb')
-    if os.path.exists(routes_path):
-        with open(routes_path, 'r') as f:
-            routes_code = f.read()
-        summary['routes'] = routes_code
-
-    # Extract gem dependencies and versions
-    gemfile_path = os.path.join(repo_path, 'Gemfile')
-    if os.path.exists(gemfile_path):
-        summary['dependencies'] = []
-        with open(gemfile_path, 'r') as f:
-            for line in f:
-                if line.startswith('gem '):
-                    parts = line.split("'")
-                    if len(parts) >= 2:
-                        gem_name = parts[1]
-                        if len(parts) >= 4:
-                            gem_version = parts[3]
-                        else:
-                            gem_version = 'latest'
-                        summary['dependencies'].append(f"{gem_name} ({gem_version})")
-
-    return summary
-
-def create_project_zip(repo_path, output_path):
-    """
-    Create a ZIP file containing the relevant project files.
-    """
-    with zipfile.ZipFile(output_path, 'w') as zip_file:
-        for root, dirs, files in os.walk(repo_path):
-            for file in files:
-                file_path = os.path.join(root, file)
-                zip_file.write(file_path, os.path.relpath(file_path, repo_path))
+def is_binary_file(file_path):
+    mime_type, _ = mimetypes.guess_type(file_path)
+    return mime_type is not None and not mime_type.startswith('text/')
 
 def get_repo_contents(repo_path):
-    """
-    Main function to get repository contents.
-    """
-    repo_name = os.path.basename(repo_path)
+    repo_contents = ""
+    for root, dirs, files in os.walk(repo_path):
+        for file in files:
+            file_path = os.path.join(root, file)
+            if not os.path.islink(file_path) and not is_binary_file(file_path):  # Skip symbolic links and binary files
+                file_contents = get_file_contents(file_path)
+                repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
+    return repo_contents
 
-    print(f"Analyzing Ruby on Rails project: {repo_name}")
-    project_summary = analyze_rails_project(repo_path)
-
-    print(f"\nCreating ZIP file for: {repo_name}")
-    output_filename = f'{repo_name}_contents.zip'
-    create_project_zip(repo_path, output_filename)
-
-    instructions = f"Prompt: Analyze the {repo_name} Ruby on Rails project to understand its structure, purpose, and functionality. Follow these steps to study the codebase:\n\n"
-    instructions += "1. Review the project summary to gain an overview of the project, its dependencies, and key components.\n\n"
-    instructions += "2. Examine the controllers, models, and views to understand the core functionality of the application.\n\n"
-    instructions += "3. Study the routes defined in `config/routes.rb` to understand the available endpoints and their corresponding actions.\n\n"
-    instructions += "4. Analyze the dependencies and gems used in the project, as specified in the `Gemfile`.\n\n"
-    instructions += "5. Investigate any configuration files (e.g., `config/database.yml`, `config/application.rb`) to understand how the project is configured.\n\n"
-    instructions += "6. Look for any tests or test directories (e.g., `spec/`, `test/`) to see how the project ensures code quality and handles different scenarios.\n\n"
-    instructions += "7. Review any documentation or inline comments to gather insights into the codebase and its intended behavior.\n\n"
-    instructions += "8. Identify any potential areas for improvement, optimization, or further exploration based on your analysis.\n\n"
-    instructions += "9. Provide a summary of your findings, including the project's purpose, key features, and any notable observations or recommendations.\n\n"
-    instructions += "Use the ZIP file and project summary provided to complete this analysis.\n\n"
-
-    return repo_name, instructions, project_summary, output_filename
-
-if __name__ == '__main__':
-    repo_path = input("Please enter the path to the local Ruby on Rails project: ")
+def get_file_contents(file_path):
+    file_contents = ""
     try:
-        repo_name, instructions, project_summary, output_filename = get_repo_contents(repo_path)
-        print(f"Project summary:\n{project_summary}\n")
-        print(f"Analysis instructions and project ZIP file saved to '{output_filename}'.")
-    except Exception as e:
-        print(f"An error occurred: {e}")
-        print("Please check the project path and try again.")
+        with open(file_path, "r", encoding="utf-8") as file:
+            file_contents = file.read()
+    except UnicodeDecodeError:
+        try:
+            with open(file_path, "r", encoding="latin-1") as file:
+                file_contents = file.read()
+        except UnicodeDecodeError:
+            file_contents = "Error: Unable to decode file contents"
+    return file_contents
+
+def create_project_zip(project_path, zip_file_path):
+    with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
+        for root, dirs, files in os.walk(project_path):
+            for file in files:
+                file_path = os.path.join(root, file)
+                if not os.path.islink(file_path) and not is_binary_file(file_path):  # Skip symbolic links and binary files
+                    zipf.write(file_path, os.path.relpath(file_path, project_path))
+
+def parse_python_file(file_path):
+    with open(file_path, "r", encoding="utf-8") as file:
+        code = file.read()
+    tree = ast.parse(code)
+    return ast.unparse(tree)
+
+def process_project(project_path):
+    project_name = os.path.basename(project_path)
+    print(f"Analyzing Ruby on Rails project: {project_name}\n")
+    
+    zip_file_path = f"{project_name}.zip"
+    print(f"Creating ZIP file for: {project_name}")
+    create_project_zip(project_path, zip_file_path)
+    
+    repo_contents = get_repo_contents(project_path)
+    
+    python_files = [file for file in os.listdir(project_path) if file.endswith(".py")]
+    for python_file in python_files:
+        python_file_path = os.path.join(project_path, python_file)
+        parsed_code = parse_python_file(python_file_path)
+        repo_contents += f"File: {python_file_path}\nParsed Code:\n{parsed_code}\n\n"
+    
+    output_file = f"{project_name}_contents.txt"
+    with open(output_file, "w", encoding="utf-8") as file:
+        file.write(repo_contents)
+    
+    print(f"\nRepository contents saved to: {output_file}")
+    print("Analysis completed.")
+
+if __name__ == "__main__":
+    project_path = input("Please enter the path to the local Ruby on Rails project (or '.' for the current directory): ")
+    
+    if project_path == '.':
+        project_path = os.getcwd()
+    
+    if os.path.exists(project_path):
+        process_project(project_path)
+    else:
+        print("The specified project path does not exist.")

@@ -1,51 +1,63 @@
-# RepoToTextForLLMs
-![hero](https://cdn.discordapp.com/attachments/1047006708813271100/1216931386032656445/im.jpeg?ex=66022eab&is=65efb9ab&hm=d472a26ec77b50ce5ee094578f888fa8b6c893bc523a5633f6987a850ae3b8d8&)
+# Rails LLMinator
 
-Automates the analysis of GitHub repositories specifically tailored for usage with large context LLMs. This Python script efficiently fetches README files, repository structure, and non-binary file contents. Additionally, it provides structured outputs complete with pre-formatted prompts to guide further analysis of the repository's content.
-
-## Features
-
-- **README Retrieval:** Automatically extracts the content of README.md to provide an initial insight into the repository.
-- **Structured Repository Traversal:** Maps out the repository's structure through an iterative traversal method, ensuring thorough coverage without the limitations of recursion.
-- **Selective Content Extraction:** Retrieves text contents from files, intelligently skipping over binary files to streamline the analysis process.
+Rails LLMinator is a Python script that analyzes a local Ruby on Rails project and generates a zip file containing the relevant project files along with analysis instructions. This tool is designed to help you understand the structure, purpose, and functionality of a Ruby on Rails project.
 
 ## Prerequisites
 
-To use **RepoToTextForLLMs**, you'll need:
+Before running the script, make sure you have the following dependencies installed:
 
-- Python installed on your system.
-- The `github` Python package.
-- A GitHub Personal Access Token configured as an environment variable (`GITHUB_TOKEN`).
+- Python 3.x
+- `gitpython` library
+- `rubyparser` library
+- `tqdm` library
 
-## Getting Started
+You can install the required libraries using pip:
 
-1. Ensure Python and the required package (`PyGithub`) are installed:
-
-```bash
-pip install PyGithub tqdm
+```
+pip install gitpython rubyparser tqdm
 ```
 
-2. Set your GitHub Personal Access Token as an environment variable:
+## Usage
 
-```python
-GITHUB_TOKEN = os.getenv('GITHUB_TOKEN', 'YOUR TOKEN HERE')
+1. Clone or download this repository to your local machine.
+
+2. Open a terminal or command prompt and navigate to the directory where the `repototxt.py` script is located.
+
+3. Run the script using the following command:
+
 ```
-
-## How to Use
-
-1. Place the script in your desired directory.
-2. Execute the script in your terminal:
-
-```bash
 python repototxt.py
 ```
 
-3. Enter the GitHub repository URL when prompted. The script will process the repository and output its findings, including the README, structure, and file contents (excluding binary files), accompanied by analysis prompts.
+4. When prompted, enter the path to your local Ruby on Rails project.
+
+5. The script will analyze the project and generate a zip file named `<project_name>_contents.zip` in the same directory as the script.
+
+6. The zip file will contain the relevant project files and a set of instructions to guide you in analyzing the project.
+
+## Output
+
+The script will provide the following output:
+
+- Project summary: A summary of the project, including its structure, dependencies, and key components.
+- Zip file: A zip file containing the relevant project files for further analysis.
+- Analysis instructions: A set of instructions to guide you in understanding the project's purpose, functionality, and potential areas for improvement.
+
+## Customization
+
+If you want to customize the analysis or extract additional information from the Ruby on Rails project, you can modify the `analyze_rails_project` function in the `repototxt.py` script. This function is responsible for extracting relevant information from the project's controllers, models, views, routes, and dependencies.
+
+## Limitations
+
+- The script currently supports analyzing Ruby on Rails projects only.
+- The accuracy and completeness of the analysis depend on the implementation of the `analyze_rails_project` function. You may need to adapt it based on your specific project structure and requirements.
 
 ## Contributing
 
-Contributions to **RepoToTextForLLMs** are welcomed. Whether it's through submitting pull requests, reporting issues, or suggesting improvements, your input helps make this tool better for everyone.
+Contributions are welcome! If you find any issues or have suggestions for improvement, please open an issue or submit a pull request on the GitHub repository.
+
+Rails LLMinator is originally forked from https://github.com/Doriandarko/RepoToTextForLLMs/ by https://github.com/Doriandark
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE).

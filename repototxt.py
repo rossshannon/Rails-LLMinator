@@ -1,7 +1,6 @@
 import os
 from tqdm import tqdm
 import zipfile
-import mimetypes
 from pathlib import Path
 
 def is_excluded(path, project_root, exclusion_patterns):
@@ -18,19 +17,6 @@ def get_repo_contents(repo_path, exclusion_patterns):
             repo_contents += f"File: {file_path}\n"
     return repo_contents
 
-def get_file_contents(file_path):
-    file_contents = ""
-    try:
-        with open(file_path, "r", encoding="utf-8") as file:
-            file_contents = file.read()
-    except UnicodeDecodeError:
-        try:
-            with open(file_path, "r", encoding="latin-1") as file:
-                file_contents = file.read()
-        except UnicodeDecodeError:
-            file_contents = "Error: Unable to decode file contents"
-    return file_contents
-
 def create_project_zip(project_path, zip_file_path, exclusion_patterns):
     if os.path.exists(zip_file_path):
         print(f"Overwriting existing ZIP file: {zip_file_path}")
@@ -38,13 +24,13 @@ def create_project_zip(project_path, zip_file_path, exclusion_patterns):
     print("Parsing and counting files in the project...")
     file_list = []
     file_count = 0
-    with tqdm(total=len(list(Path(project_path).rglob("*"))), desc="Counting files", unit="file") as pbar:
+    with tqdm(total=len(list(Path(project_path).rglob("*"))), desc="Counting files", unit="file", ncols=100) as pbar:
         for file_path in Path(project_path).rglob("*"):
             if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, project_path, exclusion_patterns) and not file_path.name.startswith(".") and "node_modules" not in file_path.parts:
                 file_list.append(file_path)
                 file_count += 1
             pbar.update(1)
-    print(f"\nFound {file_count} files.")
+    print(f"\nFound {file_count:,} files.")
     print("Creating ZIP file...")
     with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         with tqdm(total=len(file_list), desc="Adding files to ZIP", unit="file", ncols=100) as pbar:
@@ -60,12 +46,12 @@ def analyze_rails_project(project_path, exclusion_patterns):
     if controllers_path.exists():
         print("Controllers:")
         for controller_file in controllers_path.glob("*.rb"):
-            if not is_excluded(controller_file, exclusion_patterns):
+            if not is_excluded(controller_file, project_path, exclusion_patterns):
                 print(f"  - {controller_file.name}")
 
     # Analyze routes
     routes_path = Path(project_path) / "config" / "routes.rb"
-    if routes_path.exists() and not is_excluded(routes_path, exclusion_patterns):
+    if routes_path.exists() and not is_excluded(routes_path, project_path, exclusion_patterns):
         print("Routes:")
         with open(routes_path, "r") as routes_file:
             routes_content = routes_file.read()
@@ -76,7 +62,7 @@ def analyze_rails_project(project_path, exclusion_patterns):
     if models_path.exists():
         print("Models:")
         for model_file in models_path.glob("*.rb"):
-            if not is_excluded(model_file, exclusion_patterns):
+            if not is_excluded(model_file, project_path, exclusion_patterns):
                 print(f"  - {model_file.name}")
 
     # Analyze views
@@ -84,7 +70,7 @@ def analyze_rails_project(project_path, exclusion_patterns):
     if views_path.exists():
         print("Views:")
         for view_file in views_path.rglob("*"):
-            if view_file.is_file() and view_file.suffix in [".html.erb", ".html.haml", ".html.slim"] and not is_excluded(view_file, exclusion_patterns):
+            if view_file.is_file() and view_file.suffix in [".html.erb", ".html.haml", ".html.slim"] and not is_excluded(view_file, project_path, exclusion_patterns):
                 print(f"  - {view_file.relative_to(views_path)}")
 
 def process_project(project_path, exclusion_file, create_zip=True):
@@ -121,7 +107,10 @@ if __name__ == "__main__":
     if project_path == '.':
         project_path = os.getcwd()
 
+    create_zip_input = input("Do you want to create a ZIP file of the project? (Y/N): ")
+    create_zip = create_zip_input.lower() == 'y'
+
     if os.path.exists(project_path) and os.path.exists(exclusion_file):
-        process_project(project_path, exclusion_file)
+        process_project(project_path, exclusion_file, create_zip)
     else:
         print("The specified project path or exclusion file does not exist.")

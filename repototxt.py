@@ -10,7 +10,7 @@ def get_repo_contents(repo_path):
     app_path = Path(repo_path) / "app"
     if app_path.exists():
         for file_path in app_path.rglob("*"):
-            if file_path.is_file() and file_path.suffix in [".rb", ".erb", ".haml", ".slim", ".yml", ".yaml"]:
+            if file_path.is_file() and file_path.suffix in [".rb", ".erb", ".haml", ".slim", ".yml", ".yaml", ".css", ".scss", ".sass", ".js", ".jsx"]:
                 repo_contents += f"File: {file_path}\n"
     
     # Include everything under config/
@@ -34,6 +34,20 @@ def get_repo_contents(repo_path):
             if file_path.is_file() and file_path.suffix in [".rb"]:
                 repo_contents += f"File: {file_path}\n"
     
+    # Include Gemfile and Gemfile.lock
+    gemfile_path = Path(repo_path) / "Gemfile"
+    if gemfile_path.exists():
+        repo_contents += f"File: {gemfile_path}\n"
+    
+    gemfile_lock_path = Path(repo_path) / "Gemfile.lock"
+    if gemfile_lock_path.exists():
+        repo_contents += f"File: {gemfile_lock_path}\n"
+    
+    # Include package.json
+    package_json_path = Path(repo_path) / "package.json"
+    if package_json_path.exists():
+        repo_contents += f"File: {package_json_path}\n"
+    
     return repo_contents
 
 def create_project_zip(project_path, zip_file_path):
@@ -46,8 +60,14 @@ def create_project_zip(project_path, zip_file_path):
             directory_path = Path(project_path) / directory
             if directory_path.exists():
                 for file_path in directory_path.rglob("*"):
-                    if file_path.is_file() and file_path.suffix in [".rb", ".erb", ".haml", ".slim", ".yml", ".yaml"]:
+                    if file_path.is_file() and file_path.suffix in [".rb", ".erb", ".haml", ".slim", ".yml", ".yaml", ".css", ".scss", ".sass", ".js", ".jsx"]:
                         zipf.write(file_path, file_path.relative_to(project_path))
+        
+        # Include Gemfile, Gemfile.lock, and package.json
+        for file_name in ["Gemfile", "Gemfile.lock", "package.json"]:
+            file_path = Path(project_path) / file_name
+            if file_path.exists():
+                zipf.write(file_path, file_path.relative_to(project_path))
 
 def analyze_rails_project(project_path):
     print("Analyzing Ruby on Rails project...")
@@ -79,6 +99,26 @@ def analyze_rails_project(project_path):
         print("Spec files:")
         for spec_file in spec_path.rglob("*_spec.rb"):
             print(f"  - {spec_file.relative_to(spec_path)}")
+
+    # Analyze Gemfile and Gemfile.lock
+    gemfile_path = Path(project_path) / "Gemfile"
+    if gemfile_path.exists():
+        print("Gemfile:")
+        with open(gemfile_path, "r") as gemfile:
+            print(gemfile.read())
+    
+    gemfile_lock_path = Path(project_path) / "Gemfile.lock"
+    if gemfile_lock_path.exists():
+        print("Gemfile.lock:")
+        with open(gemfile_lock_path, "r") as gemfile_lock:
+            print(gemfile_lock.read())
+    
+    # Analyze package.json
+    package_json_path = Path(project_path) / "package.json"
+    if package_json_path.exists():
+        print("package.json:")
+        with open(package_json_path, "r") as package_json:
+            print(package_json.read())
 
 def process_project(project_path, create_zip=True):
     project_name = os.path.basename(project_path)

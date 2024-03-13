@@ -4,16 +4,19 @@ import zipfile
 import mimetypes
 from pathlib import Path
 
-def is_excluded(path, exclusion_patterns):
+def is_excluded(path, project_root, exclusion_patterns):
+    relative_path = path.relative_to(project_root).as_posix()
     for pattern in exclusion_patterns:
-        if path.match(pattern):
+        if relative_path.lower() == pattern.lower():
+            return True
+        if Path(relative_path.lower()).match(pattern.lower()):
             return True
     return False
 
 def get_repo_contents(repo_path, exclusion_patterns):
     repo_contents = ""
     for file_path in Path(repo_path).rglob("*"):
-        if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, exclusion_patterns):
+        if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, exclusion_patterns) and not file_path.name.startswith(".") and "node_modules" not in file_path.parts:
             file_contents = get_file_contents(file_path)
             repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
     return repo_contents
@@ -39,7 +42,7 @@ def create_project_zip(project_path, zip_file_path, exclusion_patterns):
     file_list = []
     file_count = 0
     for file_path in Path(project_path).rglob("*"):
-        if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, exclusion_patterns):
+        if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, exclusion_patterns) and not file_path.name.startswith(".") and "node_modules" not in file_path.parts:
             file_list.append(file_path)
             file_count += 1
             print(f"Files counted: {file_count}", end="\r")

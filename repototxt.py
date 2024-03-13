@@ -1,7 +1,7 @@
 import os
 import git
 from tqdm import tqdm
-import rubyparser
+import ast
 import zipfile
 
 def clone_local_repo(repo_path):
@@ -17,11 +17,65 @@ def analyze_rails_project(repo_path):
     """
     summary = {}
 
-    # Extract information from controllers, models, views, routes, etc.
-    # ...
+    # Extract information from controllers
+    controllers_path = os.path.join(repo_path, 'app', 'controllers')
+    if os.path.exists(controllers_path):
+        summary['controllers'] = []
+        for root, dirs, files in os.walk(controllers_path):
+            for file in files:
+                if file.endswith('.rb'):
+                    controller_path = os.path.join(root, file)
+                    with open(controller_path, 'r') as f:
+                        controller_code = f.read()
+                    controller_info = {
+                        'name': file[:-3],
+                        'actions': [],
+                        'code': controller_code
+                    }
+                    ruby_ast = ast.parse(controller_code)
+                    for node in ast.walk(ruby_ast):
+                        if isinstance(node, ast.FunctionDef):
+                            controller_info['actions'].append(node.name)
+                    summary['controllers'].append(controller_info)
+
+    # Extract information from models
+    models_path = os.path.join(repo_path, 'app', 'models')
+    if os.path.exists(models_path):
+        summary['models'] = []
+        for root, dirs, files in os.walk(models_path):
+            for file in files:
+                if file.endswith('.rb'):
+                    model_path = os.path.join(root, file)
+                    with open(model_path, 'r') as f:
+                        model_code = f.read()
+                    model_info = {
+                        'name': file[:-3],
+                        'code': model_code
+                    }
+                    summary['models'].append(model_info)
+
+    # Extract information from routes
+    routes_path = os.path.join(repo_path, 'config', 'routes.rb')
+    if os.path.exists(routes_path):
+        with open(routes_path, 'r') as f:
+            routes_code = f.read()
+        summary['routes'] = routes_code
 
     # Extract gem dependencies and versions
-    # ...
+    gemfile_path = os.path.join(repo_path, 'Gemfile')
+    if os.path.exists(gemfile_path):
+        summary['dependencies'] = []
+        with open(gemfile_path, 'r') as f:
+            for line in f:
+                if line.startswith('gem '):
+                    parts = line.split("'")
+                    if len(parts) >= 2:
+                        gem_name = parts[1]
+                        if len(parts) >= 4:
+                            gem_version = parts[3]
+                        else:
+                            gem_version = 'latest'
+                        summary['dependencies'].append(f"{gem_name} ({gem_version})")
 
     return summary
 

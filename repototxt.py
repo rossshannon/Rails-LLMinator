@@ -2,30 +2,21 @@ import os
 from tqdm import tqdm
 import zipfile
 import mimetypes
+import fnmatch
 
-def is_hidden(path):
-    return os.path.basename(path).startswith('.')
+def is_excluded(path, exclusion_patterns):
+    for pattern in exclusion_patterns:
+        if fnmatch.fnmatch(path, pattern):
+            return True
+    return False
 
-def is_local_yml(path):
-    return path.endswith('.local.yml')
-
-def is_binary_file(file_path):
-    mime_type, _ = mimetypes.guess_type(file_path)
-    return mime_type is not None and not mime_type.startswith('text/')
-
-def is_sock_file(file_path):
-    return file_path.endswith('.sock')
-
-def is_node_modules_dir(dir_path):
-    return os.path.basename(dir_path) == 'node_modules'
-
-def get_repo_contents(repo_path):
+def get_repo_contents(repo_path, exclusion_patterns):
     repo_contents = ""
     for root, dirs, files in os.walk(repo_path):
-        dirs[:] = [d for d in dirs if not is_hidden(d) and not is_node_modules_dir(d)]  # Ignore hidden directories and node_modules
+        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), exclusion_patterns)]
         for file in files:
             file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path) and not is_sock_file(file_path):  # Skip symbolic links, binary files, hidden files, .local.yml files, and .sock files
+            if not os.path.islink(file_path) and not is_excluded(file_path, exclusion_patterns):
                 file_contents = get_file_contents(file_path)
                 repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
     return repo_contents
@@ -43,7 +34,7 @@ def get_file_contents(file_path):
             file_contents = "Error: Unable to decode file contents"
     return file_contents
 
-def create_project_zip(project_path, zip_file_path):
+def create_project_zip(project_path, zip_file_path, exclusion_patterns):
     if os.path.exists(zip_file_path):
         print(f"Overwriting existing ZIP file: {zip_file_path}")
         os.remove(zip_file_path)
@@ -51,10 +42,10 @@ def create_project_zip(project_path, zip_file_path):
     file_list = []
     file_count = 0
     for root, dirs, files in os.walk(project_path):
-        dirs[:] = [d for d in dirs if not is_hidden(d) and not is_node_modules_dir(d)]  # Ignore hidden directories and node_modules
+        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), exclusion_patterns)]
         for file in files:
             file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path) and not is_sock_file(file_path):  # Skip symbolic links, binary files, hidden files, .local.yml files, and .sock files
+            if not os.path.islink(file_path) and not is_excluded(file_path, exclusion_patterns):
                 file_list.append((file_path, os.path.relpath(file_path, project_path)))
                 file_count += 1
                 print(f"Files counted: {file_count}", end="\r")
@@ -65,7 +56,7 @@ def create_project_zip(project_path, zip_file_path):
                 zipf.write(file_path, file_name)
                 pbar.update(1)
 
-def analyze_rails_project(project_path):
+def analyze_rails_project(project_path, exclusion_patterns):
     print("Analyzing Ruby on Rails project...")
 
     # Analyze controllers
@@ -73,12 +64,12 @@ def analyze_rails_project(project_path):
     if os.path.exists(controllers_path):
         print("Controllers:")
         for controller_file in os.listdir(controllers_path):
-            if controller_file.endswith(".rb") and not is_hidden(controller_file) and not is_local_yml(controller_file) and not is_sock_file(controller_file):
+            if controller_file.endswith(".rb") and not is_excluded(os.path.join(controllers_path, controller_file), exclusion_patterns):
                 print(f"  - {controller_file}")
 
     # Analyze routes
     routes_path = os.path.join(project_path, "config", "routes.rb")
-    if os.path.exists(routes_path) and not is_hidden(routes_path) and not is_local_yml(routes_path) and not is_sock_file(routes_path):
+    if os.path.exists(routes_path) and not is_excluded(routes_path, exclusion_patterns):
         print("Routes:")
         with open(routes_path, "r") as routes_file:
             routes_content = routes_file.read()
@@ -89,7 +80,7 @@ def analyze_rails_project(project_path):
     if os.path.exists(models_path):
         print("Models:")
         for model_file in os.listdir(models_path):
-            if model_file.endswith(".rb") and not is_hidden(model_file) and not is_local_yml(model_file) and not is_sock_file(model_file):
+            if model_file.endswith(".rb") and not is_excluded(os.path.join(models_path, model_file), exclusion_patterns):
                 print(f"  - {model_file}")
 
     # Analyze views
@@ -97,20 +88,23 @@ def analyze_rails_project(project_path):
     if os.path.exists(views_path):
         print("Views:")
         for root, dirs, files in os.walk(views_path):
-            dirs[:] = [d for d in dirs if not is_hidden(d) and not is_node_modules_dir(d)]  # Ignore hidden directories and node_modules
+            dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), exclusion_patterns)]
             for file in files:
-                if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_hidden(file) and not is_local_yml(file) and not is_sock_file(file):
+                if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_excluded(os.path.join(root, file), exclusion_patterns):
                     print(f"  - {os.path.relpath(os.path.join(root, file), views_path)}")
 
-def process_project(project_path):
+def process_project(project_path, exclusion_file):
     project_name = os.path.basename(project_path)
     print(f"Processing Ruby on Rails project: {project_name}\n")
 
+    with open(exclusion_file, "r") as file:
+        exclusion_patterns = [line.strip() for line in file.readlines()]
+
     zip_file_path = f"{project_name}.zip"
     print(f"Creating ZIP file for: {project_name}")
-    create_project_zip(project_path, zip_file_path)
+    create_project_zip(project_path, zip_file_path, exclusion_patterns)
 
-    repo_contents = get_repo_contents(project_path)
+    repo_contents = get_repo_contents(project_path, exclusion_patterns)
 
     output_file = f"{project_name}_contents.txt"
     if os.path.exists(output_file):
@@ -121,17 +115,18 @@ def process_project(project_path):
 
     print(f"\nRepository contents saved to: {output_file}")
 
-    analyze_rails_project(project_path)
+    analyze_rails_project(project_path, exclusion_patterns)
 
     print("Processing completed.")
 
 if __name__ == "__main__":
+    exclusion_file = "file-exclusions.txt"
     project_path = input("Please enter the path to the local Ruby on Rails project (or '.' for the current directory): ")
 
     if project_path == '.':
         project_path = os.getcwd()
 
-    if os.path.exists(project_path):
-        process_project(project_path)
+    if os.path.exists(project_path) and os.path.exists(exclusion_file):
+        process_project(project_path, exclusion_file)
     else:
-        print("The specified project path does not exist.")
+        print("The specified project path or exclusion file does not exist.")

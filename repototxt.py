@@ -7,9 +7,7 @@ from pathlib import Path
 def is_excluded(path, project_root, exclusion_patterns):
     relative_path = path.relative_to(project_root).as_posix()
     for pattern in exclusion_patterns:
-        if relative_path.lower() == pattern.lower():
-            return True
-        if Path(relative_path.lower()).match(pattern.lower()):
+        if relative_path.startswith(pattern):
             return True
     return False
 
@@ -41,14 +39,16 @@ def create_project_zip(project_path, zip_file_path, exclusion_patterns):
     print("Parsing and counting files in the project...")
     file_list = []
     file_count = 0
-    for file_path in Path(project_path).rglob("*"):
-        if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, project_path, exclusion_patterns) and not file_path.name.startswith(".") and "node_modules" not in file_path.parts:
-            file_list.append(file_path)
-            file_count += 1
-            print(f"Files counted: {file_count}", end="\r")
-    print("\nCreating ZIP file...")
+    with tqdm(total=len(list(Path(project_path).rglob("*"))), desc="Counting files", unit="file") as pbar:
+        for file_path in Path(project_path).rglob("*"):
+            if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, project_path, exclusion_patterns) and not file_path.name.startswith(".") and "node_modules" not in file_path.parts:
+                file_list.append(file_path)
+                file_count += 1
+            pbar.update(1)
+    print(f"\nFound {file_count} files.")
+    print("Creating ZIP file...")
     with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        with tqdm(total=len(file_list), desc="Adding files to ZIP", unit="file", ncols=100, leave=False) as pbar:
+        with tqdm(total=len(file_list), desc="Adding files to ZIP", unit="file", ncols=100) as pbar:
             for file_path in file_list:
                 zipf.write(file_path, file_path.relative_to(project_path))
                 pbar.update(1)

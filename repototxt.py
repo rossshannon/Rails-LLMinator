@@ -13,13 +13,16 @@ def is_binary_file(file_path):
     mime_type, _ = mimetypes.guess_type(file_path)
     return mime_type is not None and not mime_type.startswith('text/')
 
+def is_sock_file(file_path):
+    return file_path.endswith('.sock')
+
 def get_repo_contents(repo_path):
     repo_contents = ""
     for root, dirs, files in os.walk(repo_path):
         dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
         for file in files:
             file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path):  # Skip symbolic links, binary files, hidden files, and .local.yml files
+            if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path) and not is_sock_file(file_path):  # Skip symbolic links, binary files, hidden files, .local.yml files, and .sock files
                 file_contents = get_file_contents(file_path)
                 repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
     return repo_contents
@@ -46,11 +49,13 @@ def create_project_zip(project_path, zip_file_path):
         dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
         for file in files:
             file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path):  # Skip symbolic links, binary files, hidden files, and .local.yml files
+            if not os.path.islink(file_path) and not is_binary_file(file_path) and not is_hidden(file_path) and not is_local_yml(file_path) and not is_sock_file(file_path):  # Skip symbolic links, binary files, hidden files, .local.yml files, and .sock files
                 file_list.append((file_path, os.path.relpath(file_path, project_path)))
     with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-        for file_path, file_name in tqdm(file_list, desc="Creating ZIP file", unit="file"):
-            zipf.write(file_path, file_name)
+        with tqdm(total=len(file_list), desc="Creating ZIP file", unit="file", ncols=100, leave=False) as pbar:
+            for file_path, file_name in file_list:
+                zipf.write(file_path, file_name)
+                pbar.update(1)
 
 def analyze_rails_project(project_path):
     print("Analyzing Ruby on Rails project...")
@@ -60,12 +65,12 @@ def analyze_rails_project(project_path):
     if os.path.exists(controllers_path):
         print("Controllers:")
         for controller_file in os.listdir(controllers_path):
-            if controller_file.endswith(".rb") and not is_hidden(controller_file) and not is_local_yml(controller_file):
+            if controller_file.endswith(".rb") and not is_hidden(controller_file) and not is_local_yml(controller_file) and not is_sock_file(controller_file):
                 print(f"  - {controller_file}")
 
     # Analyze routes
     routes_path = os.path.join(project_path, "config", "routes.rb")
-    if os.path.exists(routes_path) and not is_hidden(routes_path) and not is_local_yml(routes_path):
+    if os.path.exists(routes_path) and not is_hidden(routes_path) and not is_local_yml(routes_path) and not is_sock_file(routes_path):
         print("Routes:")
         with open(routes_path, "r") as routes_file:
             routes_content = routes_file.read()
@@ -76,7 +81,7 @@ def analyze_rails_project(project_path):
     if os.path.exists(models_path):
         print("Models:")
         for model_file in os.listdir(models_path):
-            if model_file.endswith(".rb") and not is_hidden(model_file) and not is_local_yml(model_file):
+            if model_file.endswith(".rb") and not is_hidden(model_file) and not is_local_yml(model_file) and not is_sock_file(model_file):
                 print(f"  - {model_file}")
 
     # Analyze views
@@ -86,7 +91,7 @@ def analyze_rails_project(project_path):
         for root, dirs, files in os.walk(views_path):
             dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
             for file in files:
-                if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_hidden(file) and not is_local_yml(file):
+                if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_hidden(file) and not is_local_yml(file) and not is_sock_file(file):
                     print(f"  - {os.path.relpath(os.path.join(root, file), views_path)}")
 
 def process_project(project_path):

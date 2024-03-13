@@ -15,8 +15,7 @@ def get_repo_contents(repo_path, exclusion_patterns):
     repo_contents = ""
     for file_path in Path(repo_path).rglob("*"):
         if file_path.is_file() and not file_path.is_symlink() and not is_excluded(file_path, repo_path, exclusion_patterns) and not file_path.name.startswith(".") and "node_modules" not in file_path.parts:
-            file_contents = get_file_contents(file_path)
-            repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
+            repo_contents += f"File: {file_path}\n"
     return repo_contents
 
 def get_file_contents(file_path):
@@ -88,16 +87,17 @@ def analyze_rails_project(project_path, exclusion_patterns):
             if view_file.is_file() and view_file.suffix in [".html.erb", ".html.haml", ".html.slim"] and not is_excluded(view_file, exclusion_patterns):
                 print(f"  - {view_file.relative_to(views_path)}")
 
-def process_project(project_path, exclusion_file):
+def process_project(project_path, exclusion_file, create_zip=True):
     project_name = os.path.basename(project_path)
     print(f"Processing Ruby on Rails project: {project_name}\n")
 
     with open(exclusion_file, "r") as file:
         exclusion_patterns = [line.strip() for line in file.readlines()]
 
-    zip_file_path = f"{project_name}.zip"
-    print(f"Creating ZIP file for: {project_name}")
-    create_project_zip(project_path, zip_file_path, exclusion_patterns)
+    if create_zip:
+        zip_file_path = f"{project_name}.zip"
+        print(f"Creating ZIP file for: {project_name}")
+        create_project_zip(project_path, zip_file_path, exclusion_patterns)
 
     repo_contents = get_repo_contents(project_path, exclusion_patterns)
 

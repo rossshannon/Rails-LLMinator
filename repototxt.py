@@ -4,19 +4,20 @@ import zipfile
 import mimetypes
 import fnmatch
 
-def is_excluded(path, exclusion_patterns):
+def is_excluded(path, base_path, exclusion_patterns):
+    rel_path = os.path.relpath(path, base_path)
     for pattern in exclusion_patterns:
-        if fnmatch.fnmatch(path, pattern):
+        if fnmatch.fnmatch(rel_path, pattern):
             return True
     return False
 
 def get_repo_contents(repo_path, exclusion_patterns):
     repo_contents = ""
     for root, dirs, files in os.walk(repo_path):
-        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), exclusion_patterns)]
+        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), repo_path, exclusion_patterns)]
         for file in files:
             file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_excluded(file_path, exclusion_patterns):
+            if not os.path.islink(file_path) and not is_excluded(file_path, repo_path, exclusion_patterns):
                 file_contents = get_file_contents(file_path)
                 repo_contents += f"File: {file_path}\nContent:\n{file_contents}\n\n"
     return repo_contents
@@ -42,10 +43,10 @@ def create_project_zip(project_path, zip_file_path, exclusion_patterns):
     file_list = []
     file_count = 0
     for root, dirs, files in os.walk(project_path):
-        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), exclusion_patterns)]
+        dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), project_path, exclusion_patterns)]
         for file in files:
             file_path = os.path.join(root, file)
-            if not os.path.islink(file_path) and not is_excluded(file_path, exclusion_patterns):
+            if not os.path.islink(file_path) and not is_excluded(file_path, project_path, exclusion_patterns):
                 file_list.append((file_path, os.path.relpath(file_path, project_path)))
                 file_count += 1
                 print(f"Files counted: {file_count}", end="\r")
@@ -64,12 +65,12 @@ def analyze_rails_project(project_path, exclusion_patterns):
     if os.path.exists(controllers_path):
         print("Controllers:")
         for controller_file in os.listdir(controllers_path):
-            if controller_file.endswith(".rb") and not is_excluded(os.path.join(controllers_path, controller_file), exclusion_patterns):
+            if controller_file.endswith(".rb") and not is_excluded(os.path.join(controllers_path, controller_file), project_path, exclusion_patterns):
                 print(f"  - {controller_file}")
 
     # Analyze routes
     routes_path = os.path.join(project_path, "config", "routes.rb")
-    if os.path.exists(routes_path) and not is_excluded(routes_path, exclusion_patterns):
+    if os.path.exists(routes_path) and not is_excluded(routes_path, project_path, exclusion_patterns):
         print("Routes:")
         with open(routes_path, "r") as routes_file:
             routes_content = routes_file.read()
@@ -80,7 +81,7 @@ def analyze_rails_project(project_path, exclusion_patterns):
     if os.path.exists(models_path):
         print("Models:")
         for model_file in os.listdir(models_path):
-            if model_file.endswith(".rb") and not is_excluded(os.path.join(models_path, model_file), exclusion_patterns):
+            if model_file.endswith(".rb") and not is_excluded(os.path.join(models_path, model_file), project_path, exclusion_patterns):
                 print(f"  - {model_file}")
 
     # Analyze views
@@ -88,9 +89,9 @@ def analyze_rails_project(project_path, exclusion_patterns):
     if os.path.exists(views_path):
         print("Views:")
         for root, dirs, files in os.walk(views_path):
-            dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), exclusion_patterns)]
+            dirs[:] = [d for d in dirs if not is_excluded(os.path.join(root, d), project_path, exclusion_patterns)]
             for file in files:
-                if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_excluded(os.path.join(root, file), exclusion_patterns):
+                if file.endswith((".html.erb", ".html.haml", ".html.slim")) and not is_excluded(os.path.join(root, file), project_path, exclusion_patterns):
                     print(f"  - {os.path.relpath(os.path.join(root, file), views_path)}")
 
 def process_project(project_path, exclusion_file):

@@ -38,6 +38,9 @@ def get_file_contents(file_path):
     return file_contents
 
 def create_project_zip(project_path, zip_file_path):
+    if os.path.exists(zip_file_path):
+        print(f"Overwriting existing ZIP file: {zip_file_path}")
+        os.remove(zip_file_path)
     with zipfile.ZipFile(zip_file_path, "w", zipfile.ZIP_DEFLATED) as zipf:
         for root, dirs, files in os.walk(project_path):
             dirs[:] = [d for d in dirs if not is_hidden(d)]  # Ignore hidden directories
@@ -94,6 +97,9 @@ def process_project(project_path):
     repo_contents = get_repo_contents(project_path)
 
     output_file = f"{project_name}_contents.txt"
+    if os.path.exists(output_file):
+        print(f"Overwriting existing output file: {output_file}")
+        os.remove(output_file)
     with open(output_file, "w", encoding="utf-8") as file:
         file.write(repo_contents)
 

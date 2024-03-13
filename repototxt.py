@@ -131,16 +131,37 @@ def process_project(project_path, create_zip=True):
 
     repo_contents = get_repo_contents(project_path)
 
+    analyze_rails_project(project_path)
+
+    instructions = f"Prompt: Analyze the {project_name} repository to understand its structure, purpose, and functionality. Follow these steps to study the Ruby on Rails codebase:\n\n"
+    instructions += "1. Read the README file to gain an overview of the project, its goals, and any setup instructions.\n\n"
+    instructions += "2. Examine the repository structure to understand how the files and directories are organized in a typical Ruby on Rails project.\n\n"  
+    instructions += "3. Identify the main entry point of the application (typically config/routes.rb) and start analyzing the code flow from there.\n\n"
+    instructions += "4. Study the Gemfile to understand the dependencies and libraries used in the project, including Ruby gems and other external tools.\n\n"
+    instructions += "5. Analyze the core functionality of the project by examining the models, controllers, and views in the app directory.\n\n"
+    instructions += "6. Look for configuration files (e.g., config/database.yml, config/application.rb) to understand how the project is configured and what settings are available.\n\n"
+    instructions += "7. Investigate the test directory to see how the project ensures code quality and handles different scenarios using testing frameworks like RSpec or Minitest.\n\n"
+    instructions += "8. Review any documentation or inline comments to gather insights into the codebase and its intended behavior.\n\n"
+    instructions += "9. Identify any potential areas for improvement, optimization, or further exploration based on your analysis, considering Ruby on Rails best practices and conventions.\n\n"
+    instructions += "10. Provide a summary of your findings, including the project's purpose, key features, and any notable observations or recommendations related to the Ruby on Rails implementation.\n\n"
+    instructions += "Use the files and contents provided below to complete this analysis:\n\n"
+
     output_file = f"{project_name}_contents.txt"
     if os.path.exists(output_file):
         print(f"Overwriting existing output file: {output_file}")
         os.remove(output_file)
-    with open(output_file, "w", encoding="utf-8") as file:
-        file.write(repo_contents)
 
-    print(f"\nRepository contents saved to: {output_file}")
-
-    analyze_rails_project(project_path)
+    try:
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(instructions)
+            f.write('\n\n')
+            f.write(repo_contents)
+        print(f"Repository structure saved to '{output_file}'.")
+    except ValueError as ve:
+        print(f"Error: {ve}")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        print("Please check the repository URL and try again.")
 
     print("Processing completed.")
 
